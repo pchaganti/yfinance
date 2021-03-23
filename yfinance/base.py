@@ -339,7 +339,8 @@ class TickerBase():
             if isinstance(data.get(item), dict):
                 self._info.update(data[item])
 
-        self._info['regularMarketPrice'] = data['price']['regularMarketPrice']
+        if self._info.get('regularMarketOpen'):
+            self._info['regularMarketPrice'] = self._info['regularMarketOpen']
         self._info['logo_url'] = ""
         try:
             domain = self._info['website'].split(
