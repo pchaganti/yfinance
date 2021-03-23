@@ -6,3 +6,5 @@ yfinance.egg-info
 .coverage
 .vscode/
 build/
+*.swp
+*.swo
