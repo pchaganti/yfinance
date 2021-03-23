@@ -3,4 +3,4 @@ numpy>=1.16.5
 requests>=2.21
 multitasking>=0.0.7
 lxml>=4.5.1
-
+yliveticker>=0.2.5
