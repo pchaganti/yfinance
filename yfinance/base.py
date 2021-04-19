@@ -44,6 +44,7 @@ from . import shared
 class TickerBase():
     def __init__(self, ticker, session=None):
         self.ticker = ticker.upper()
+        self.session = session or _requests
         self._history = None
         self._base_url = 'https://query1.finance.yahoo.com'
         self._scrape_url = 'https://finance.yahoo.com/quote'
@@ -238,7 +239,7 @@ class TickerBase():
 
         if params["interval"][-1] == "m":
             df.index.name = "Datetime"
-        elif params["interval"] == '1h':
+        elif params["interval"] == "1h":
             pass
         else:
             df.index = _pd.to_datetime(df.index.date)
@@ -289,7 +290,7 @@ class TickerBase():
         ticker_url = "{}/{}".format(self._scrape_url, self.ticker)
 
         # get info and sustainability
-        data = utils.get_json(ticker_url, proxy)
+        data = utils.get_json(ticker_url, proxy, self.session)
 
         # holders
         url = "{}/{}/holders".format(self._scrape_url, self.ticker)
@@ -326,14 +327,26 @@ class TickerBase():
 
                 self._sustainability = s[~s.index.isin(
                     ['maxAge', 'ratingYear', 'ratingMonth'])]
+        except Exception:
+            pass
 
         # info (be nice to python 2)
         self._info = {}
-        items = ['summaryProfile', 'summaryDetail', 'quoteType',
-                 'defaultKeyStatistics', 'assetProfile', 'summaryDetail', 'financialData']
-        for item in items:
-            if isinstance(data.get(item), dict):
-                self._info.update(data[item])
+        try:
+            items = ['summaryProfile', 'summaryDetail', 'quoteType',
+                     'defaultKeyStatistics', 'assetProfile', 'summaryDetail']
+            for item in items:
+                if isinstance(data.get(item), dict):
+                    self._info.update(data[item])
+        except Exception:
+            pass
+
+        try:
+            # self._info['regularMarketPrice'] = self._info['regularMarketOpen']
+            self._info['regularMarketPrice'] = data.get('price', {}).get(
+                'regularMarketPrice', self._info['regularMarketOpen'])
+        except Exception:
+            pass
 
         if self._info.get('regularMarketOpen'):
             self._info['regularMarketPrice'] = self._info['regularMarketOpen']
@@ -379,7 +392,7 @@ class TickerBase():
             pass
 
         # get fundamentals
-        data = utils.get_json(ticker_url+'/financials', proxy)
+        data = utils.get_json(ticker_url+'/financials', proxy, self.session)
 
         # generic patterns
         for key in (
@@ -387,7 +400,6 @@ class TickerBase():
             (self._balancesheet, 'balanceSheet', 'balanceSheetStatements'),
             (self._financials, 'incomeStatement', 'incomeStatementHistory')
         ):
-
             item = key[1] + 'History'
             if isinstance(data.get(item), dict):
                 try:
@@ -475,7 +487,9 @@ class TickerBase():
         self._get_fundamentals(proxy=proxy)
         data = self._earnings[freq]
         if as_dict:
-            return data.to_dict()
+            dict_data = data.to_dict()
+            dict_data['financialCurrency'] = 'USD' if 'financialCurrency' not in self._earnings else self._earnings['financialCurrency']
+            return dict_data
         return data
 
     def get_financials(self, proxy=None, as_dict=False, freq="yearly"):
